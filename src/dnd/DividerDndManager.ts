@@ -1,7 +1,6 @@
 import { Platform, TFile } from "obsidian";
 import type ExplorerDividerPlugin from "../main";
 import { waitForFileExplorerEl } from "../utils/fileExplorer";
-import { initLog } from "../utils/log";
 import {
 	computeDividerCreatedTimestamp,
 	readCreatedForAboveBelowFromMetadataCache,
@@ -12,7 +11,6 @@ import { tryExecuteCommand } from "../utils/commands";
 type DropPosition = "before" | "after";
 
 export class DividerDndManager {
-	private log = initLog("DIVIDER-DND", "#a6ff00");
 	private explorerEl!: HTMLElement;
 	private mutationObserver: MutationObserver | null = null;
 
@@ -59,7 +57,6 @@ export class DividerDndManager {
 				e.preventDefault();
 			}
 
-			this.log("Drag started", { sourcePath });
 
 			const explorerRect = this.explorerEl.getBoundingClientRect();
 			let isOutsideExplorer = false;
@@ -109,7 +106,6 @@ export class DividerDndManager {
 			};
 
 			const onDrop = async () => {
-				this.log("Drag ended");
 				cancelAnimationFrame(this.rafId);
 				draggedEl.removeEventListener(this.dragEventType, onDrag);
 
@@ -119,14 +115,12 @@ export class DividerDndManager {
 				draggedEl.removeAttribute("data-is-being-dragged");
 
 				if (isOutsideExplorer) {
-					this.log("Dropped outside explorer", { sourcePath });
 					return;
 				}
 
 
 				const dividerFile = this.getTFileFromPath(sourcePath);
 				if (!dividerFile) {
-					this.log("Dropped divider but could not resolve TFile", { sourcePath });
 					futureSibling = null;
 					return;
 				}
@@ -138,17 +132,6 @@ export class DividerDndManager {
 					belowFile,
 				});
 
-				this.log("Dropped divider", { sourcePath, ...dropSummary });
-				console.log("Explorer-Divider: divider drop TFiles", {
-					dividerFile,
-					aboveFile,
-					belowFile,
-				});
-				console.log("Explorer-Divider: adjacent created from cache", {
-					aboveCreated,
-					belowCreated,
-				});
-
 				const nextCreated = computeDividerCreatedTimestamp({
 					abovePath: dropSummary.abovePath,
 					belowPath: dropSummary.belowPath,
@@ -157,19 +140,12 @@ export class DividerDndManager {
 				});
 
 				if (nextCreated === null) {
-					this.log("No created update applied (invalid/missing neighbors)", {
-						abovePath: dropSummary.abovePath,
-						belowPath: dropSummary.belowPath,
-						aboveCreated,
-						belowCreated,
-					});
 					futureSibling = null;
 					return;
 				}
 
 				try {
 					await writeCreatedToFrontmatter(this.plugin.app, dividerFile, nextCreated);
-					this.log("Updated divider created", { sourcePath, created: nextCreated });
 				} catch (error) {
 					console.warn("Explorer-Divider: failed to update divider created", error);
 					futureSibling = null;
@@ -180,7 +156,6 @@ export class DividerDndManager {
 				if (refreshIdOrSuffix) {
 					try {
 						const ok = await tryExecuteCommand(this.plugin.app, refreshIdOrSuffix);
-						this.log("Sort refresh command executed", { refreshIdOrSuffix, ok });
 					} catch (error) {
 						console.warn("Explorer-Divider: failed to execute sort refresh command", error);
 					}
@@ -222,7 +197,6 @@ export class DividerDndManager {
 
 			e.preventDefault();
 			e.stopPropagation();
-			this.log("Blocked divider left-click", { path: dividerEl.dataset.path ?? null });
 		};
 
 		this.explorerEl.addEventListener("mousedown", this.mouseDownHandler);
@@ -230,7 +204,7 @@ export class DividerDndManager {
 		this.explorerEl.addEventListener(this.dragStartEventType, this.dragStartHandler);
 		this.explorerEl.addEventListener("click", this.clickBlockHandler, { capture: true });
 
-		this.log("DnD enabled");
+		console.log("DnD enabled");
 	}
 
 	disable() {
@@ -247,7 +221,7 @@ export class DividerDndManager {
 		this.mutationObserver = null;
 
 		this.clearDropIndicators();
-		this.log("DnD disabled");
+		console.log("DnD disabled");
 	}
 
 	private isDividerPath(path: string): boolean {
@@ -279,7 +253,7 @@ export class DividerDndManager {
 			)
 		);
 
-		const firstTreeItem = treeItems.at(0);
+		const firstTreeItem = treeItems[0];
 		if (!firstTreeItem) return { futureSibling: null, dropPosition: "before" };
 
 		let futureSibling: HTMLElement = firstTreeItem;
