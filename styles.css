@@ -1,8 +1,45 @@
-/*
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
 
-If your plugin does not need CSS, delete this file.
+/* Highlight divider notes in the file explorer */
+[data-type='file-explorer'] .tree-item-self[data-explorer-divider='true'] {
+	background: hsla(var(--interactive-accent-hsl), 0.12);
+	border-left: 3px solid var(--color-accent);
+	border-radius: var(--radius-s);
+}
 
-*/
+[data-type='file-explorer'] .tree-item-self[data-explorer-divider='true'] .tree-item-inner {
+	color: var(--text-accent);
+	font-weight: 600;
+	letter-spacing: 0.06em;
+}
+
+[data-type='file-explorer'] {
+	&:has([data-drag-active]) {
+		.tree-item {
+			position: relative;
+		}
+
+		.tree-item[data-drop-position='before']::before,
+		.tree-item[data-drop-position='after']::after {
+			content: '';
+			position: absolute;
+			height: 2px;
+			left: 10%;
+			width: 80%;
+			background: var(--color-accent);
+		}
+
+		.tree-item[data-drop-position='before']::before {
+			top: 0;
+		}
+
+		.tree-item[data-drop-position='after']::after {
+			bottom: 0;
+		}
+
+		.nav-folder.is-drop-target {
+			background: hsla(var(--interactive-accent-hsl), 0.05);
+			border-radius: var(--radius-s);
+		}
+	}
+}

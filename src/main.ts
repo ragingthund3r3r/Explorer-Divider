@@ -1,99 +1,65 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import { Plugin } from "obsidian";
+import {
+	DEFAULT_SETTINGS,
+	ExplorerDividerSettings,
+	ExplorerDividerSettingTab,
+} from "./settings";
+import { registerCommands } from "./commands";
+import { DividerDndManager } from "./dnd/DividerDndManager";
 
-// Remember to rename these classes and interfaces!
-
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class ExplorerDividerPlugin extends Plugin {
+	settings: ExplorerDividerSettings;
+	private dividerDndManager: DividerDndManager | null = null;
+	private isEnablingDnd = false;
 
 	async onload() {
 		await this.loadSettings();
+		this.addSettingTab(new ExplorerDividerSettingTab(this.app, this));
+		registerCommands(this);
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		// The file explorer leaf can be created after plugin onload.
+		// Enable DnD once the layout is ready, and retry on later layout changes.
+		this.app.workspace.onLayoutReady(() => {
+			void this.maybeEnableDividerDnd();
 		});
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			}
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
+		this.registerEvent(
+			this.app.workspace.on("layout-change", () => {
+				void this.maybeEnableDividerDnd();
+			})
+		);
 	}
 
 	onunload() {
+		this.dividerDndManager?.disable();
+		this.dividerDndManager = null;
+	}
+
+	private async maybeEnableDividerDnd(): Promise<void> {
+		if (this.dividerDndManager) return;
+		if (this.isEnablingDnd) return;
+		this.isEnablingDnd = true;
+		try {
+			const manager = new DividerDndManager(this);
+			await manager.enable();
+			this.dividerDndManager = manager;
+			this.register(() => this.dividerDndManager?.disable());
+		} catch (error) {
+			// Don't spam; this can happen if the user has the file explorer closed.
+			console.warn("Explorer-Divider: failed to enable divider DnD", error);
+		} finally {
+			this.isEnablingDnd = false;
+		}
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			(await this.loadData()) as Partial<ExplorerDividerSettings>
+		);
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
 	}
 }
